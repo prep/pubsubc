@@ -4,17 +4,20 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/pubsub"
 )
 
 var (
-	help    = flag.Bool("help", false, "Display usage information")
 	debug   = flag.Bool("debug", false, "Enable debug logging")
+	help    = flag.Bool("help", false, "Display usage information")
 	version = flag.Bool("version", false, "Display version information")
+	wait    = flag.String("wait", "", "Wait until the specified socket is open")
 )
 
 // The CommitHash and Revision variables are set during building.
@@ -88,6 +91,28 @@ func main() {
 	if *version {
 		fmt.Println(versionString())
 		return
+	}
+
+	// If a wait socket has been specified, continue only when the socket allows
+	// incoming connections.
+	if *wait != "" {
+		stopTime := time.Now().Add(1 * time.Minute)
+
+		for {
+			// Don't wait indefinitely.
+			if time.Now().After(stopTime) {
+				fatalf("Unable to connect to PubSub socket %q after some time. Aborting.", *wait)
+			}
+
+			conn, err := net.Dial("tcp", *wait)
+			if err != nil {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+
+			conn.Close()
+			break
+		}
 	}
 
 	// Cycle over the numbered PUBSUB_PROJECT environment variables.
