@@ -105,6 +105,8 @@ func main() {
 			break
 		}
 
+		fmt.Printf("Creating project with env %q\n", env)
+
 		// Separate the projectID from the topic definitions.
 		parts := strings.Split(env, ",")
 		if len(parts) < 2 {
