@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -73,6 +74,31 @@ func create(ctx context.Context, projectID string, topics Topics) error {
 	return nil
 }
 
+// getEnvWithWildcard retrieves all environment variables where the key matches the wildcard pattern.
+// In this simple implementation, '*' matches any sequence of characters.
+func getEnvWithWildcard(wildcard string) map[string]string {
+	envVars := make(map[string]string)
+	for _, env := range os.Environ() {
+		pair := strings.SplitN(env, "=", 2)
+		key := pair[0]
+		value := pair[1]
+
+		// Simple pattern matching: replace '*' with a ".*" regex equivalent for matching.
+		// Note: This does not handle multiple wildcards or other wildcard characters.
+		pattern := "^" + strings.ReplaceAll(wildcard, "*", ".*") + "$"
+		matched, err := regexp.MatchString(pattern, key)
+		if err != nil {
+			fmt.Printf("Invalid pattern: %v\n", err)
+			continue
+		}
+
+		if matched {
+			envVars[key] = value
+		}
+	}
+	return envVars
+}
+
 func main() {
 	flag.Parse()
 	flag.Usage = func() {
@@ -90,27 +116,25 @@ func main() {
 		return
 	}
 
-	// Cycle over the numbered PUBSUB_PROJECT environment variables.
-	for i := 1; ; i++ {
-		// Fetch the enviroment variable. If it doesn't exist, break out.
-		currentEnv := fmt.Sprintf("PUBSUB_PROJECT%d", i)
-		env := os.Getenv(currentEnv)
-		if env == "" {
-			// If this is the first environment variable, print the usage info.
-			if i == 1 {
-				flag.Usage()
-				os.Exit(1)
-			}
+	pubsubProjects := getEnvWithWildcard("PUBSUB_PROJECT_*")
+	if len(pubsubProjects) == 0 {
+		fatalf("%s: Expected at least 1 PUBSUB_PROJECT_* env param")
+	}
 
-			break
-		}
+	for matchKey, env := range pubsubProjects {
+		fmt.Printf("")
 
-		fmt.Printf("Creating project with env %q\n", env)
+		fmt.Printf("Creating project %s", matchKey)
+
+		re := regexp.MustCompile(`\s+`)
+		cleanedEnv := re.ReplaceAllString(env, "")
+		cleanedEnv = strings.ReplaceAll(cleanedEnv, "\n", "")
+		cleanedEnv = strings.ReplaceAll(cleanedEnv, " ", "")
 
 		// Separate the projectID from the topic definitions.
-		parts := strings.Split(env, ",")
+		parts := strings.Split(cleanedEnv, ",")
 		if len(parts) < 2 {
-			fatalf("%s: Expected at least 1 topic to be defined", currentEnv)
+			fatalf("%s: Expected at least 1 topic to be defined", env)
 		}
 
 		// Separate the topicID from the subscription IDs.
