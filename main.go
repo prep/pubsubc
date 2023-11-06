@@ -53,7 +53,7 @@ func create(ctx context.Context, projectID string, topics Topics) error {
 	}
 	defer client.Close()
 
-	debugf("Client connected with project ID %q", projectID)
+	debugf("\nClient connected with project ID %q\n", projectID)
 
 	for topicID, subscriptions := range topics {
 		debugf("  Creating topic %q", topicID)
